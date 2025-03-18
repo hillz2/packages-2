@@ -28,12 +28,12 @@ jobs:
           tar -xJf openwrt-sdk-22.03.5-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz
           mv openwrt-sdk-22.03.5-x86-64_gcc-11.2.0_musl.Linux-x86_64 sdk
 
-      # Step 3: Configure feeds (custom + OpenWrt packages)
+      # Step 3: Configure feeds (add custom feed, avoid duplicates)
       - name: Update and install feeds
         working-directory: sdk
         run: |
+          # Append custom feed only (default feeds.conf.default already has 'packages')
           echo "src-link custom $(pwd)/../" >> feeds.conf.default
-          echo "src-git packages https://git.openwrt.org/feed/packages.git" >> feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a -p custom
           ./scripts/feeds install -a -p packages
