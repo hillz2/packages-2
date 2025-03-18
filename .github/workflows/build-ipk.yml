@@ -1,0 +1,55 @@
+name: Build bandwidthd IPK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      variant:
+        description: 'Bandwidthd variant to build (no-db, pgsql, sqlite, php)'
+        required: true
+        default: 'no-db'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout your fork at the specific commit
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: 1913cb70f5ba4c8391d67bb783572e63ea029758
+
+      # Step 2: Set up the OpenWrt SDK (OpenWrt 22.03.5, x86_64)
+      - name: Download OpenWrt SDK
+        run: |
+          wget https://downloads.openwrt.org/releases/22.03.5/targets/x86/64/openwrt-sdk-22.03.5-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+          tar -xJf openwrt-sdk-22.03.5-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz
+          mv openwrt-sdk-22.03.5-x86-64_gcc-11.2.0_musl.Linux-x86_64 sdk
+
+      # Step 3: Configure feeds (custom + OpenWrt packages)
+      - name: Update and install feeds
+        working-directory: sdk
+        run: |
+          echo "src-link custom $(pwd)/../" >> feeds.conf.default
+          echo "src-git packages https://git.openwrt.org/feed/packages.git" >> feeds.conf.default
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a -p custom
+          ./scripts/feeds install -a -p packages
+
+      # Step 4: Build the specified bandwidthd variant
+      - name: Build bandwidthd package
+        working-directory: sdk
+        env:
+          BUILD_VARIANT: ${{ github.event.inputs.variant || 'no-db' }}
+        run: |
+          make defconfig
+          make package/utils/bandwidthd/compile V=s -j$(nproc)
+
+      # Step 5: Upload the .ipk file as an artifact
+      - name: Upload IPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandwidthd-${{ github.event.inputs.variant || 'no-db' }}-ipk
+          path: sdk/bin/packages/x86_64/custom/bandwidthd*.ipk
